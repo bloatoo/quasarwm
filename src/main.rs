@@ -1,5 +1,4 @@
-use quasar::Quasar;
-use quasarwm::quasar;
+use quasarwm::structs::Quasar;
 
 fn main() {
     Quasar::default().run();
