@@ -79,6 +79,7 @@ impl Quasar {
         }
     }
 
+
     pub fn run(&mut self) {
         loop {
             let event = self.conn.wait_for_event().unwrap();
@@ -109,6 +110,14 @@ impl Quasar {
                         xcb::cast_event(&event)
                     };
                     self.add_window(ev.window());
+                    let screen = self.conn.get_setup().roots().nth(0).unwrap();
+
+                    xcb::configure_window(&self.conn, ev.window(), &[
+                        (xcb::CONFIG_WINDOW_X as u16, 0),
+                        (xcb::CONFIG_WINDOW_Y as u16, 0),
+                        (xcb::CONFIG_WINDOW_WIDTH as u16, screen.width_in_pixels() as u32),
+                        (xcb::CONFIG_WINDOW_HEIGHT as u16, screen.height_in_pixels() as u32),
+                    ]);
                 }
                 
                 DestroyNotify => {
@@ -127,18 +136,20 @@ impl Quasar {
     }   
 
     pub fn change_workspace(&mut self, workspace_idx: usize) {
-        let workspace = self.workspaces.get(self.current_workspace).unwrap();
+        if self.current_workspace != workspace_idx {
+            let workspace = self.workspaces.get(self.current_workspace).unwrap();
 
-        for win in workspace.windows.clone() {
-            xcb::unmap_window(&self.conn, win);
-        }
+            for win in workspace.windows.clone() {
+                xcb::unmap_window(&self.conn, win);
+            }
 
-        let workspace_new = self.workspaces.get(workspace_idx).unwrap();
-
-        self.current_workspace = workspace_idx;
-
-        for win in workspace_new.windows.clone() {
-            xcb::map_window(&self.conn, win);
+            let workspace_new = self.workspaces.get(workspace_idx).unwrap();
+            
+            self.current_workspace = workspace_idx;
+             
+            for win in workspace_new.windows.clone() {
+                xcb::map_window(&self.conn, win);
+            }
         }
     }
 }
