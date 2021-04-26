@@ -27,7 +27,7 @@ impl Quasar {
 
         let mut commands: HashMap<u8, fn() -> ()> = HashMap::new();
 
-        commands.insert(28, || { Command::new("alacritty").spawn().unwrap(); });
+        commands.insert(36, || { Command::new("alacritty").spawn().unwrap(); });
         commands.insert(33, || { Command::new("dmenu_run").spawn().unwrap(); });
 
         let mod_mask = xcb::MOD_MASK_4;
