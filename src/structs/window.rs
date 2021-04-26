@@ -35,23 +35,19 @@ impl Window {
         self.area = area;
     }
 
-    pub fn geometry(window_count: usize, idx: usize, x: u32, y: u32, width: u32, height: u32, vertical: bool) -> Vec<Rect> {
+    pub fn geometry(window_count: usize, idx: usize, x: u32, y: u32, width: u32, height: u32, vertical: usize) -> Vec<Rect> {
         match window_count {
             0 => vec![],
             1 => vec![Rect::new(x, y, width, height)],
             _ => {
-                match vertical {
-                    true => {
+                if idx % 2 == vertical {
                         let mut vec = vec![Rect::new(x, y, width, height / 2)];
-                        vec.append(&mut Window::geometry(window_count - 1, idx + 1, x, y + height / 2 ,width, height / 2, false));
+                        vec.append(&mut Window::geometry(window_count - 1, idx + 1, x, y + height / 2 ,width, height / 2, 0));
                         vec
-                    },
-    
-                    false => {
+                } else {
                         let mut vec = vec![Rect::new(x, y, width / 2, height)];
-                        vec.append(&mut Window::geometry(window_count - 1, idx + 1, x + width / 2, y, width / 2, height, true));
+                        vec.append(&mut Window::geometry(window_count - 1, idx + 1, x + width / 2, y, width / 2, height, 1));
                         vec
-                    }
                 }
             }
         }

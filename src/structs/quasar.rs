@@ -118,7 +118,7 @@ impl Quasar {
                     self.add_window(window);
 
                     let workspace = self.workspaces.get_mut(self.current_workspace).unwrap();
-                    workspace.resize(Layout::Spiral, rect.width, rect.height, &self.conn);
+                    workspace.resize(Layout::Quasar, rect.width, rect.height, &self.conn);
 
                     xcb::change_window_attributes(&self.conn, ev.window(), &[
                         (xcb::CW_BORDER_PIXEL, 0xab4642),
@@ -137,7 +137,7 @@ impl Quasar {
                     self.del_window(ev.window());
 
                     let workspace = self.workspaces.get_mut(self.current_workspace).unwrap();
-                    workspace.resize(Layout::Spiral, width, height, &self.conn);
+                    workspace.resize(Layout::Quasar, width, height, &self.conn);
 
                 }
 
@@ -166,7 +166,7 @@ impl Quasar {
                 xcb::map_window(&self.conn, win.identifier);
             }
 
-            workspace_new.resize(Layout::Spiral, screen.width_in_pixels() as u32, screen.height_in_pixels() as u32, &self.conn);
+            workspace_new.resize(Layout::Quasar, screen.width_in_pixels() as u32, screen.height_in_pixels() as u32, &self.conn);
         }
     }
 }

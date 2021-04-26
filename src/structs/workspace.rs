@@ -3,7 +3,7 @@ use xcb::Connection;
 use super::window::Window;
 
 pub enum Layout {
-    Spiral,
+    Quasar,
 }
 
 pub struct Workspace {
@@ -22,7 +22,7 @@ impl Workspace {
         let count = self.windows.len();
 
         match layout {
-            Layout::Spiral => {
+            Layout::Quasar => {
                 let geos = Window::geometry(
                     count,
                     0,
@@ -30,11 +30,11 @@ impl Workspace {
                     5,
                     width - 20,
                     height - 20,
-                    if count % 2 == 0 {
-                        false
-                    } else {
-                        true
-                    }
+                    /*if count % 2 == 0 {
+                        0
+                    } else {*/
+                        1
+                    //}
                 );
 
                 for (i, window) in self.windows.iter_mut().enumerate() {
