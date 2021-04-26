@@ -120,6 +120,11 @@ impl Quasar {
                         (xcb::CONFIG_WINDOW_Y as u16, rect.y),
                         (xcb::CONFIG_WINDOW_WIDTH as u16, rect.width),
                         (xcb::CONFIG_WINDOW_HEIGHT as u16, rect.height),
+                        (xcb::CONFIG_WINDOW_BORDER_WIDTH as u16, 5),
+                    ]);
+
+                    xcb::change_window_attributes(&self.conn, ev.window(), &[
+                        (xcb::CW_BORDER_PIXEL, 0xab4642),
                     ]);
                 }
                 
