@@ -62,9 +62,11 @@ impl Workspace {
 
     pub fn close_focused_window(&mut self, conn: &Connection) {
         xcb::destroy_window(conn, self.windows.get(self.focused_window).unwrap().identifier as u32);
-        if self.windows.len() > 0 {
-            self.focused_window -= 1
-        }
+
+        /*if self.windows.len() > 0 {
+            self.focus_up();
+        }*/
+
         self.remove_window(self.focused_window as u32);
     }
 

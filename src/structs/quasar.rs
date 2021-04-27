@@ -83,6 +83,7 @@ impl Quasar {
             Some(workspace) => {
                 if workspace.windows.iter().find(|win| win.identifier == window.identifier).is_none() {
                     workspace.windows.push(window);
+                    workspace.focus_down();
                 }
             }
 
@@ -93,8 +94,8 @@ impl Quasar {
     fn del_window(&mut self, window: u32) {
         for workspace in &mut self.workspaces {
             if workspace.has_window(window) {
-                workspace.focused_window = 0;
                 workspace.remove_window(window);
+                workspace.focus_up();
             }
         }
     }
