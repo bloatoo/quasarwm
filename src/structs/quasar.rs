@@ -12,6 +12,13 @@ pub struct Quasar {
     pub current_workspace: usize,
     pub conn: xcb::Connection,
     pub commands: HashMap<u8, fn() -> ()>,
+    pub actions: HashMap<u8, Action>,
+}
+
+pub enum Action {
+    CloseWindow,
+    CycleWindowUp,
+    CycleWindowDown,
 }
 
 impl Quasar {
@@ -26,11 +33,20 @@ impl Quasar {
         let mut workspaces: Vec<Workspace> = Vec::new();
 
         let mut commands: HashMap<u8, fn() -> ()> = HashMap::new();
+        let mut actions: HashMap<u8, Action> = HashMap::new();
 
         commands.insert(36, || { Command::new("alacritty").spawn().unwrap(); });
         commands.insert(33, || { Command::new("dmenu_run").spawn().unwrap(); });
 
+        actions.insert(54, Action::CloseWindow);
+        actions.insert(45, Action::CycleWindowUp);
+        actions.insert(44, Action::CycleWindowDown);
+
         let mod_mask = xcb::MOD_MASK_4;
+
+        for key in actions.iter().map(|elem| elem.0) {
+            xcb::grab_key(&conn, false, screen.root(), mod_mask as u16, *key, xcb::GRAB_MODE_ASYNC as u8, xcb::GRAB_MODE_ASYNC as u8);
+        }
 
         for key in commands.iter().map(|elem| elem.0) {
             xcb::grab_key(&conn, false, screen.root(), mod_mask as u16, *key, xcb::GRAB_MODE_ASYNC as u8, xcb::GRAB_MODE_ASYNC as u8);
@@ -47,13 +63,16 @@ impl Quasar {
 
             workspaces.push(Workspace {
                 name,
+                gap: 10,
                 windows: Vec::new(),
+                focused_window: 0,
             })
         }
 
         Self {
             conn,
             commands,
+            actions,
             current_workspace: 0,
             workspaces,
         }
@@ -74,6 +93,7 @@ impl Quasar {
     fn del_window(&mut self, window: u32) {
         for workspace in &mut self.workspaces {
             if workspace.has_window(window) {
+                workspace.focused_window = 0;
                 workspace.remove_window(window);
             }
         }
@@ -95,7 +115,21 @@ impl Quasar {
                     let keycode = ev.detail();
                     
                     if let Some(command) = self.commands.get(&keycode) {
-                        command();
+                       command();
+                    
+                    } else if let Some(action) = self.actions.get(&keycode){ 
+                        let workspace = self.workspaces.get_mut(self.current_workspace).unwrap();
+
+                        match action {
+                            Action::CloseWindow => workspace.close_focused_window(&self.conn),
+                            Action::CycleWindowUp => workspace.focus_up(),
+                            Action::CycleWindowDown => workspace.focus_down()
+                        }
+
+                        let screen = self.conn.get_setup().roots().nth(0).unwrap();
+
+                        let rect = Rect::new(0, 0,  screen.width_in_pixels() as u32, screen.height_in_pixels() as u32);
+                        workspace.resize(Layout::Quasar, rect.width, rect.height, &self.conn);
                     } else {
                         match keycode {
                             10..=20 => self.change_workspace(keycode as usize - 10),
@@ -121,7 +155,7 @@ impl Quasar {
                     workspace.resize(Layout::Quasar, rect.width, rect.height, &self.conn);
 
                     xcb::change_window_attributes(&self.conn, ev.window(), &[
-                        (xcb::CW_BORDER_PIXEL, 0xab4642),
+                        (xcb::CW_BORDER_PIXEL, if workspace.windows.len() - 1 == workspace.focused_window { 0xab4642 } else { 0x282828 }),
                     ]);
                 }
                 

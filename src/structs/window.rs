@@ -10,6 +10,12 @@ pub struct Rect {
 pub struct Window {
     pub area: Rect,
     pub identifier: u32,
+    pub border: Border,
+}
+
+#[derive(Clone, Copy)]
+pub struct Border {
+    pub width: u16,
 }
 
 impl Rect {
@@ -23,11 +29,20 @@ impl Rect {
     }
 }
 
+impl From<u16> for Border {
+    fn from(data: u16) -> Self {
+        Self {
+            width: data.into(),
+        }
+    }
+}
+
 impl Window {
     pub fn new(identifier: u32, area: Rect) -> Self {
         Self {
             identifier,
             area,
+            border: Border::from(5),
         }
     }
     
