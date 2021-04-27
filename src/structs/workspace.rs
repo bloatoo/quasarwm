@@ -61,7 +61,9 @@ impl Workspace {
     }
 
     pub fn close_focused_window(&mut self, conn: &Connection) {
-        xcb::destroy_window(conn, self.windows.get(self.focused_window).unwrap().identifier as u32);
+        if let Some(window) = self.windows.get(self.focused_window) {
+            xcb::destroy_window(conn, window.identifier as u32);
+        }
 
         /*if self.windows.len() > 0 {
             self.focus_up();

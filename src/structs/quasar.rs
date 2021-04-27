@@ -35,6 +35,7 @@ impl Quasar {
         let mut commands: HashMap<u8, fn() -> ()> = HashMap::new();
         let mut actions: HashMap<u8, Action> = HashMap::new();
 
+        //commands.insert(36, || { Command::new("alacritty").arg("-e").arg("zsh").spawn().unwrap(); });
         commands.insert(36, || { Command::new("alacritty").spawn().unwrap(); });
         commands.insert(33, || { Command::new("dmenu_run").spawn().unwrap(); });
 
