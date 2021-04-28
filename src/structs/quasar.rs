@@ -19,6 +19,7 @@ pub enum Action {
     CloseWindow,
     CycleWindowUp,
     CycleWindowDown,
+    Exit,
 }
 
 impl Quasar {
@@ -42,6 +43,7 @@ impl Quasar {
         actions.insert(54, Action::CloseWindow);
         actions.insert(45, Action::CycleWindowUp);
         actions.insert(44, Action::CycleWindowDown);
+        actions.insert(24, Action::Exit);
 
         let mod_mask = xcb::MOD_MASK_4;
 
@@ -125,7 +127,8 @@ impl Quasar {
                         match action {
                             Action::CloseWindow => workspace.close_focused_window(&self.conn),
                             Action::CycleWindowUp => workspace.focus_up(),
-                            Action::CycleWindowDown => workspace.focus_down()
+                            Action::CycleWindowDown => workspace.focus_down(),
+                            Action::Exit => break,
                         }
 
                         let screen = self.conn.get_setup().roots().nth(0).unwrap();
