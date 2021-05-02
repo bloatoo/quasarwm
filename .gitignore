@@ -1,2 +1,4 @@
 /target
 Cargo.lock
+qctl/target
+qctl/Cargo.lock

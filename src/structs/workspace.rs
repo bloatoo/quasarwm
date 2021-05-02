@@ -20,7 +20,7 @@ impl Workspace {
             .find(|win| win.identifier == identifier).is_some()
     }
 
-    pub fn resize(&mut self, layout: Layout, width: u32, height: u32, conn: &Connection) {
+    pub fn resize(&mut self, layout: Layout, width: u32, height: u32, border_width: u32, conn: &Connection) {
         let count = self.windows.len();
 
         match layout {
@@ -43,9 +43,9 @@ impl Workspace {
                     xcb::configure_window(conn, window.identifier, &[
                         (xcb::CONFIG_WINDOW_X as u16, geo.x),
                         (xcb::CONFIG_WINDOW_Y as u16, geo.y),
-                        (xcb::CONFIG_WINDOW_WIDTH as u16, geo.width - self.gap * 2 - window.border.width as u32 * 2),
-                        (xcb::CONFIG_WINDOW_HEIGHT as u16, geo.height - self.gap * 2 - window.border.width as u32 * 2),
-                        (xcb::CONFIG_WINDOW_BORDER_WIDTH as u16, window.border.width as u32),
+                        (xcb::CONFIG_WINDOW_WIDTH as u16, geo.width - self.gap * 2 - border_width * 2),
+                        (xcb::CONFIG_WINDOW_HEIGHT as u16, geo.height - self.gap * 2 - border_width * 2),
+                        (xcb::CONFIG_WINDOW_BORDER_WIDTH as u16, border_width),
                     ]);
 
                     xcb::change_window_attributes(&conn, window.identifier, &[

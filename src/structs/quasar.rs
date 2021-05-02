@@ -1,16 +1,14 @@
-use std::{
-    collections::HashMap,
-    process::Command,
-};
+use std::{collections::HashMap, process::Command, sync::mpsc::{self, Sender}, thread};
 
 use crate::response_type;
 use super::window::{Window, Rect};
 use super::workspace::{Layout, Workspace};
+use std::os::unix::net::{UnixListener, UnixStream}; use std::io::{BufRead, BufReader};
+use super::config::Config;
+use crate::utils;
 
 pub struct Quasar {
-    pub workspaces: Vec<Workspace>,
-    pub current_workspace: usize,
-    pub conn: xcb::Connection,
+    pub workspaces: Vec<Workspace>, pub current_workspace: usize, pub conn: xcb::Connection, pub config: Config,
     pub commands: HashMap<u8, fn() -> ()>,
     pub actions: HashMap<u8, Action>,
 }
@@ -39,6 +37,7 @@ impl Quasar {
         //commands.insert(36, || { Command::new("alacritty").arg("-e").arg("zsh").spawn().unwrap(); });
         commands.insert(36, || { Command::new("alacritty").spawn().unwrap(); });
         commands.insert(33, || { Command::new("dmenu_run").spawn().unwrap(); });
+
 
         actions.insert(54, Action::CloseWindow);
         actions.insert(45, Action::CycleWindowUp);
@@ -76,6 +75,7 @@ impl Quasar {
             conn,
             commands,
             actions,
+            config: Config::default(),
             current_workspace: 0,
             workspaces,
         }
@@ -104,86 +104,132 @@ impl Quasar {
     }
 
     pub fn run(&mut self) {
-        loop {
-            let event = self.conn.wait_for_event().unwrap();
-            let r = event.response_type();
+        let (sender, receiver) = mpsc::channel::<String>();
 
-            use response_type::ResponseType::{self, *};
+        thread::spawn(move || {
+            let path_str = "/tmp/quasarwm.sock";
 
-            match ResponseType::from(r) {
-                KeyPress => {
-                    let ev: &xcb::KeyPressEvent = unsafe {
-                        xcb::cast_event(&event)
-                    };
-                    
-                    let keycode = ev.detail();
-                    
-                    if let Some(command) = self.commands.get(&keycode) {
-                       command();
-                    
-                    } else if let Some(action) = self.actions.get(&keycode){ 
-                        let workspace = self.workspaces.get_mut(self.current_workspace).unwrap();
-
-                        match action {
-                            Action::CloseWindow => workspace.close_focused_window(&self.conn),
-                            Action::CycleWindowUp => workspace.focus_up(),
-                            Action::CycleWindowDown => workspace.focus_down(),
-                            Action::Exit => break,
-                        }
-
-                        let screen = self.conn.get_setup().roots().nth(0).unwrap();
-
-                        let rect = Rect::new(0, 0,  screen.width_in_pixels() as u32, screen.height_in_pixels() as u32);
-                        workspace.resize(Layout::Quasar, rect.width, rect.height, &self.conn);
-                    } else {
-                        match keycode {
-                            10..=20 => self.change_workspace(keycode as usize - 10),
-                          _ => ()
-                        }
-                    }
-                }
-
-                MapNotify => {
-                    let ev: &xcb::MapNotifyEvent = unsafe {
-                        xcb::cast_event(&event)
-                    };
-
-                    let screen = self.conn.get_setup().roots().nth(0).unwrap();
-
-                    let rect = Rect::new(0, 0,  screen.width_in_pixels() as u32, screen.height_in_pixels() as u32);
-
-                    let window = Window::new(ev.window(), rect);
-                    
-                    self.add_window(window);
-
-                    let workspace = self.workspaces.get_mut(self.current_workspace).unwrap();
-                    workspace.resize(Layout::Quasar, rect.width, rect.height, &self.conn);
-
-                    xcb::change_window_attributes(&self.conn, ev.window(), &[
-                        (xcb::CW_BORDER_PIXEL, if workspace.windows.len() - 1 == workspace.focused_window { 0xab4642 } else { 0x282828 }),
-                    ]);
-                }
-                
-                DestroyNotify => {
-                    let ev: &xcb::DestroyNotifyEvent = unsafe {
-                        xcb::cast_event(&event)
-                    };
-                     
-                    let screen = self.conn.get_setup().roots().nth(0).unwrap();
-                    let height = screen.height_in_pixels() as u32;
-                    let width = screen.width_in_pixels() as u32;
-
-                    self.del_window(ev.window());
-
-                    let workspace = self.workspaces.get_mut(self.current_workspace).unwrap();
-                    workspace.resize(Layout::Quasar, width, height, &self.conn);
-
-                }
-
-                _ => ()
+            if std::path::Path::new(path_str).exists() {
+                std::fs::remove_file(path_str).unwrap();
             }
 
-            self.conn.flush();
+            let listener = UnixListener::bind(path_str).unwrap();
+
+            fn handle_conn(stream: UnixStream, sender: Sender<String>) {
+                let stream = BufReader::new(stream);
+
+                for line in stream.lines() {
+                    sender.send(line.unwrap()).unwrap();
+                }
+            }
+
+            for stream in listener.incoming() {
+                let sender = sender.clone();
+
+                match stream {
+                    Ok(stream) => {
+                        thread::spawn(move || handle_conn(stream, sender));
+                    },
+                     
+                    Err(err) => {
+                        println!("Error: {}", err);
+                        break;
+                    }
+                }
+            }
+        });
+
+        loop {
+            let event = self.conn.poll_for_event();
+
+            if let Ok(msg) = receiver.try_recv() {
+                utils::parse_command(msg, &mut self.config);
+            }
+
+            match event {
+                Some(event) => {
+                    let r = event.response_type();
+
+                    use response_type::ResponseType::{self, *};
+
+                    match ResponseType::from(r) {
+                        KeyPress => {
+                            let ev: &xcb::KeyPressEvent = unsafe {
+                                xcb::cast_event(&event)
+                            };
+                            
+                            let keycode = ev.detail();
+                            
+                            if let Some(command) = self.commands.get(&keycode) {
+                               command();
+                            
+                            } else if let Some(action) = self.actions.get(&keycode){ 
+                                let workspace = self.workspaces.get_mut(self.current_workspace).unwrap();
+
+                                match action {
+                                    Action::CloseWindow => workspace.close_focused_window(&self.conn),
+                                    Action::CycleWindowUp => workspace.focus_up(),
+                                    Action::CycleWindowDown => workspace.focus_down(),
+                                    Action::Exit => break,
+                                }
+                                
+                                let screen = self.conn.get_setup().roots().nth(0).unwrap();
+                                
+                                let rect = Rect::new(0, 0,  screen.width_in_pixels() as u32, screen.height_in_pixels() as u32);
+                                workspace.resize(Layout::Quasar, rect.width, rect.height, self.config.border_width as u32, &self.conn);
+                            } else {
+                                match keycode {
+                                    10..=20 => self.change_workspace(keycode as usize - 10),
+                                  _ => ()
+                                }
+                            }
+                        }
+
+                        MapNotify => {
+                            let ev: &xcb::MapNotifyEvent = unsafe {
+                                xcb::cast_event(&event)
+                            };
+                            
+                            let screen = self.conn.get_setup().roots().nth(0).unwrap();
+                            
+                            let rect = Rect::new(0, 0,  screen.width_in_pixels() as u32, screen.height_in_pixels() as u32);
+                            
+                            let window = Window::new(ev.window(), rect);
+                            
+                            self.add_window(window);
+                            
+                            let workspace = self.workspaces.get_mut(self.current_workspace).unwrap();
+                            workspace.resize(Layout::Quasar, rect.width, rect.height, self.config.border_width as u32, &self.conn);
+                        
+                            xcb::change_window_attributes(&self.conn, ev.window(), &[
+                                (xcb::CW_BORDER_PIXEL, if workspace.windows.len() - 1 == workspace.focused_window { 0xab4642 } else { 0x282828 }),
+                            ]);
+                        }
+                
+                        DestroyNotify => {
+                            let ev: &xcb::DestroyNotifyEvent = unsafe {
+                                xcb::cast_event(&event)
+                            };
+                      
+                            let screen = self.conn.get_setup().roots().nth(0).unwrap();
+                            let height = screen.height_in_pixels() as u32;
+                            let width = screen.width_in_pixels() as u32;
+                            
+                            self.del_window(ev.window());
+                            
+                            let workspace = self.workspaces.get_mut(self.current_workspace).unwrap();
+                            workspace.resize(Layout::Quasar, width, height, self.config.border_width as u32, &self.conn);
+                            
+                        }
+                        
+                        _ => ()
+                    }
+                    
+                    self.conn.flush();
+                }
+
+                None => ()
+            }
         }   
     }   
 
@@ -205,7 +251,7 @@ impl Quasar {
                 xcb::map_window(&self.conn, win.identifier);
             }
 
-            workspace_new.resize(Layout::Quasar, screen.width_in_pixels() as u32, screen.height_in_pixels() as u32, &self.conn);
+            workspace_new.resize(Layout::Quasar, screen.width_in_pixels() as u32, screen.height_in_pixels() as u32, self.config.border_width as u32, &self.conn);
         }
     }
 }
