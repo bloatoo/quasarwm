@@ -38,7 +38,6 @@ impl Quasar {
         commands.insert(36, || { Command::new("alacritty").spawn().unwrap(); });
         commands.insert(33, || { Command::new("dmenu_run").spawn().unwrap(); });
 
-
         actions.insert(54, Action::CloseWindow);
         actions.insert(45, Action::CycleWindowUp);
         actions.insert(44, Action::CycleWindowDown);
